@@ -34,10 +34,10 @@
 #define MAX_ENERGY_POINTS 5000      // probability function distribution
 #define MAX_CONTRIBUTIONS 10
 #define MAX_FLAG__ 3
-#define MAX_SHORTEST_PATH 50        // max number of atom to reach any atom of the same molecule
+#define MAX_SHORTEST_PATH 25        // max number of atom to reach any atom of the same molecule
 #define MAX_PATH__ 255              // max size of path length
 #define MAX_REMARK 5000             // max size of comment length
-#define MAX_NUM_RES 500             // max number of residues allowed 
+#define MAX_NUM_RES 250             // max number of residues allowed 
 #define MAX_NUM_MODES 5             // max number of normal modes
 #define MAX_NUM_ATM 10000           // max number of atoms allowed 
 #define MAX_ATM_HET 200             // max number of atoms in het groups allowed 
@@ -61,8 +61,8 @@
 #define KDIST    1.0e3
 #define DEE_WALL_THRESHOLD 50.0
 
-#define PI 3.14159265
-#define E  2.71828183
+#define PI 3.141592
+#define E  2.718281
 #define Rw 1.4f
 
 #define NEW(p,type)     if ((p=(type *) malloc (sizeof(type))) == NULL) { \
@@ -99,13 +99,11 @@
 typedef unsigned int uint;
 
 struct cf_str{  // Complementarity Function value structure
-	double com;    	// complementarity value
-	double con;    	// constraint value
-	double wal;    	// wall term
-	double sas;    	// solvent accessibility surface
-	double totsas; 	// overall sas of molecule
-	double ligsolv;	// desolvation of ligand (area in contact with target are not solvated)
-	double tarsolv; // desolvation of target (area in contact with ligand are not solvated)
+	double com;    // complementarity value
+	double con;    // constraint value
+	double wal;    // wall term
+	double sas;    // solvent accessibility surface
+	double totsas; // overall sas of molecule
 	int   rclash; // flag that shows whether the residue is making steric clashes
 };
 typedef struct cf_str cfstr;
@@ -518,7 +516,6 @@ void   calc_cleftic(FA_Global* FA,gridpoint* cleftgrid);                        
 void   buildlist(FA_Global* FA,atom* atoms,resid* residue,int rnum, int bnum, int *tot, int lout[]);// creates list of atoms that need to be rebuilt
 void   buildcc(FA_Global* FA,atom* atoms,int tot,int list[]);                        // creates cartesian coordinates from internal coords.
 void   buildic(FA_Global* FA,atom* atoms,resid* residue,int rnum);                   // creates internal coordinates from cartesian.
-void   buildic_reference(FA_Global* FA,atom* atoms,resid* residue,int rnum);                   // creates internal coordinates from cartesian coordinates of the reference.
 void   add2_optimiz_vec(FA_Global* FA,atom* atoms,resid* residue,int val[], char chain, const char* extras);            // adds atoms that need to be optimized
 void   realloc_par(FA_Global* FA, int* MIN_PAR); // reallocs memory for par in add2 function
 void   read_lig(FA_Global* FA,atom** atoms,resid** residue,char ligfile[]);                           // reads ligands

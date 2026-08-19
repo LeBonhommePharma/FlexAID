@@ -1,165 +1,26 @@
-#include "BindingMode.h"
+    #include "BindingMode.h"
 
-boost::random::mt19937 gen;
 /*****************************************\
 			BindingPopulation  
 \*****************************************/
 // public (explicitely requires unsigned int temperature) *non-overloadable*
 // BindingPopulation::BindingPopulation(unsigned int temp) : Temperature(temp)
-BindingPopulation::BindingPopulation(FA_Global* pFA, GB_Global* pGB, VC_Global* pVC, chromosome* pchrom, genlim* pgene_lim, atom* patoms, resid* presidue, gridpoint* pcleftgrid, int num_chrom) : Temperature(pFA->temperature), PartitionFunction(0.0), SolvatedPartitionFunction(0.0), nChroms(num_chrom), FA(pFA), GB(pGB), VC(pVC), chroms(pchrom), gene_lim(pgene_lim), atoms(patoms), residue(presidue), cleftgrid(pcleftgrid)
+BindingPopulation::BindingPopulation(FA_Global* pFA, GB_Global* pGB, VC_Global* pVC, chromosome* pchrom, genlim* pgene_lim, atom* patoms, resid* presidue, gridpoint* pcleftgrid, int num_chrom) : Temperature(pFA->temperature), PartitionFunction(0.0), nChroms(num_chrom), FA(pFA), GB(pGB), VC(pVC), chroms(pchrom), gene_lim(pgene_lim), atoms(patoms), residue(presidue), cleftgrid(pcleftgrid)
 {
-	// the number of dimensions is used for the vectors of coordinates
-	this->nDimensions = this->FA->num_het_atm*3;	// use with Vectorized_Cartesian_Coordinates()
-    // this->nDimensions = this->FA->npar + 2; 	// use with Vectorized_Chromosome()
-    
-    // iterates through all the chromosomes 
-	for(int i = 0; i < nChroms; ++i)
-	{
-		// builds the Pose object
-		Pose pose = Pose(&chroms[i], i, -1, 0.0f, this->Temperature, this->Vectorized_Cartesian_Coordinates(i));
-		// check against NaN values before adding the pose to the population
-		//  (adding the pose the population means that it contributes to the partition function)
-		if( !boost::math::isnan(pose.boltzmann_weight) )
-		{
-			this->Poses.push_back(pose);
-		}
-	}
-    
-	// calculate the partition function and the solvated partition function
-	for(std::vector<Pose>::iterator iPose = this->Poses.begin(); iPose != this->Poses.end(); ++iPose)
-	{
-		this->PartitionFunction += iPose->boltzmann_weight;
-		this->SolvatedPartitionFunction += iPose->solvated_boltzmann_weight;
-	}
-
-	for(std::vector<Pose>::iterator iPose = this->Poses.begin(); iPose != this->Poses.end(); ++iPose)
-	{
-		double Pi = iPose->boltzmann_weight / this->PartitionFunction;
-		// CFdS {∆G} += Pi*CFi {∆H} - T*(-PilnPi) {T∆S}
-		iPose->CFdS += Pi*iPose->CF - this->Temperature*(-1 * Pi * log(Pi));
-	}
 }
 
 
 void BindingPopulation::add_BindingMode(BindingMode& mode)
 {
+	for(std::vector<Pose>::iterator pose = mode.Poses.begin(); pose != mode.Poses.end(); ++pose)
+	{
+		this->PartitionFunction += pose->boltzmann_weight;
+	}
     mode.set_energy();
 	this->BindingModes.push_back(mode);
-//	this->Entropize();
+	this->Entropize();
 }
 
-bool BindingPopulation::merge_BindingModes(std::vector< BindingMode >::iterator mode1, std::vector< BindingMode >::iterator mode2)
-{
-	// assign BindingMode* pointers to mode1 and mode 2
-	// BindingMode::BindingMode Current(this);
-	BindingMode Current = BindingMode(this);
-	// BindingMode Current = BindingMode::BindingMode(this);
-
-//	 if necessary, exchange pointers in order to merge Poses into the lowest energy BindingMpde
-     for(std::vector< Pose >::iterator itp = mode1->Poses.begin(); itp != mode1->Poses.end(); ++itp)
-     {
-     	Current.add_Pose(*itp);
-     }
-     for(std::vector< Pose >::iterator itp = mode2->Poses.begin(); itp != mode2->Poses.end(); ++itp)
-     {
-     	Current.add_Pose(*itp);
-     }
-    // check if the BindingMode is homogenic enough to be added and to consider
-    // the merger of *mode2 into *mode1 as successful
-    if(Current.isHomogenic())
-    {
-    	for(std::vector<Pose>::iterator itp = mode2->Poses.begin(); itp != mode2->Poses.end(); ++itp)
-    	{
-    		mode1->add_Pose(*itp);
-    	}
-    	// invalidate BindingMode pointed by mode2 (all its poses are added into *mode1)
-    	mode2->isValid = false;
-    	// return that the merge was successful (as of now, the return value is unused tho)
-    	return true;
-    }
-    else
-    {
-//    	no modification could be made, return FALSE as the merging status of mode1 and mode2
-    	return false;
-    }
-}
-
-void BindingPopulation::remove_BindingMode(std::vector<BindingMode>::iterator mode)
-{
-	this->BindingModes.erase(mode);
-}
-
-void BindingPopulation::remove_invalid_BindingModes()
-{
-	// for(std::vector< BindingMode >::iterator it = this->BindingModes.begin(); it != this->BindingModes.end(); ++it)
-	for(int i = 0; i < this->get_Population_size(); ++i)
-	{
-		// the call to remove_BindingMode() might seem superfluous as of now,
-		// but could later be useful to call as a standalone function so I left it.
-		// if(!it->isValid) this->remove_BindingMode(it);
-		if( !this->BindingModes[i].isValid ) this->BindingModes.erase( this->BindingModes.begin() + i );
-	}
-}
-
-unsigned long BindingPopulation::rank_BindingMode_free_ligand_energy(std::vector<BindingMode>::const_iterator mode) const
-{
-
-	unsigned long rank = this->get_Population_size() - 1;
-
-
-	for(std::vector<BindingMode>::const_iterator iMode = this->BindingModes.begin(); iMode != this->BindingModes.end(); ++iMode)
-	{
-		if( mode->compute_free_ligand_energy() < iMode->compute_free_ligand_energy() ) --rank;
-	}
-
-	return rank;
-}
-
-unsigned long BindingPopulation::rank_BindingMode_solvated_energy(std::vector<BindingMode>::const_iterator mode) const
-{
-	unsigned long rank = this->get_Population_size() - 1;
-
-
-	for(std::vector<BindingMode>::const_iterator iMode = this->BindingModes.begin(); iMode != this->BindingModes.end(); ++iMode)
-	{
-		if( mode->compute_solvated_complex_energy() < iMode->compute_solvated_complex_energy() ) --rank;
-	}
-
-	return rank;
-}
-
-void BindingPopulation::Classify_BindingModes()
-{
-	int i = 0, j = 0;
-	float sizeTolerance = this->FA->cluster_rmsd;
-	// float sizeTolerance = (2 - static_cast<float>(2.0f/3.0f)) * this->FA->cluster_rmsd;
-	for(std::vector<BindingMode>::iterator it1 = this->BindingModes.begin(); it1 != this->BindingModes.end() && i < this->get_Population_size(); ++it1, ++i)
-	{
-		for(std::vector<BindingMode>::iterator it2 = this->BindingModes.begin(); it2 != this->BindingModes.end() && j < this->get_Population_size(); ++it2, ++j)
-		{
-			// do not proceed further if (*it1) and (*it2) are the same BindingMode
-			// if((*it1) == (*it2)) continue;
-			if( i == j ) continue;
-
-			// do not proceed further if any of the two BindingModes isn't valid
-			else if(!it1->isValid || !it2->isValid) continue;
-
-			else if(this->compute_distance((*it1->elect_Representative(false)), (*it2->elect_Representative(false))) <= sizeTolerance )
-			{
-				this->merge_BindingModes(it1, it2);
-			}
-
-			else if( this->compute_vec_distance(it1->compute_centroid(), it2->compute_centroid()) <= sizeTolerance)
-			{
-				this->merge_BindingModes(it1, it2);
-			}
-
-		}
-	}
-	// upon merging the BindingModes A and B, all the poses found in B are added to A
-	// thus invaliding the BindingMode B (all of its poses are now part of A and B should not be considered)
-	this->remove_invalid_BindingModes();
-}
 
 void BindingPopulation::Entropize()
 {
@@ -167,301 +28,39 @@ void BindingPopulation::Entropize()
 	{
 		it->set_energy();
 	}
-	// sort BindingModes using customly defined BindingPopulation::EnergyComparator's comparator=
-	std::sort(this->BindingModes.begin(), this->BindingModes.end(), BindingPopulation::EnergyComparator());
+	std::sort(this->BindingModes.begin(), this->BindingModes.end(), BindingPopulation::EnergyComparator::EnergyComparator());
 }
 
-float BindingPopulation::compute_distance(const Pose& pose1, const Pose& pose2) const
-{
-	float distance = 0.0f;
-	// perform distance^2 calculation
-	for(int i = 0; i < pose1.vPose.size(); ++i)
-	{
-		float temp = pose1.vPose[i] - pose2.vPose[i];
-		distance += temp * temp;
-	}
-	// return square-root of distance^2
-	return sqrtf(distance / static_cast<float>(this->FA->num_het_atm));
-}
-float BindingPopulation::compute_distance(std::vector<Pose>::const_iterator pose1,std::vector<Pose>::const_iterator pose2) const
-{
-	float distance = 0.0f;
-	// perform distance^2 calculation
-	for(int i = 0; i < pose1->vPose.size() && i < pose2->vPose.size(); ++i)
-	{
-		float temp = pose1->vPose[i] - pose2->vPose[i];
-		distance += temp * temp;
-	}
-	// return square-root of distance^2
-	return sqrtf(distance / static_cast<float>(this->FA->num_het_atm));
-}
 
-float BindingPopulation::compute_vec_distance(std::vector<float> v1 ,std::vector<float> v2) const
-{
-	float distance = 0.0f;
-	// perform distance^2 calculation
-	for(int i = 0; i < v1.size() && i < v2.size(); ++i)
-	{
-		float temp = v1[i] - v2[i];
-		distance += temp * temp;
-	}
-	// return square-root of distance^2
-	return sqrtf(distance / static_cast<float>(this->FA->num_het_atm));
-}
+int BindingPopulation::get_Population_size() { return this->BindingModes.size(); }
 
-int BindingPopulation::get_Population_size() const { return static_cast<int>(this->BindingModes.size()); }
-
-int BindingPopulation::count_free_ligand_conformations() const
-{
-	// count the total number of ligand conformational states in solution
-	return (this->FA->nflexbonds) ? this->FA->nflexbonds * static_cast<int>( 360 / this->FA->delta_flexible ) * static_cast<int>(360 / this->FA->delta_angle) * static_cast<int>(360 / this->FA->delta_dihedral) : static_cast<int>(360 / this->FA->delta_angle) * static_cast<int>(360 / this->FA->delta_dihedral);
-}
 
 // output BindingMode up to nResults results
-void BindingPopulation::output_Population(int nResults, char* end_strfile, char* tmp_end_strfile, char* dockinp, char* gainp)
+void BindingPopulation::output_Population(int nResults, char* end_strfile, char* tmp_end_strfile, char* dockinp, char* gainp, int minPoints)
 {
-    this->Entropize();
-	bool accept = true;
-	float sizeTolerance =  this->FA->cluster_rmsd;
-	// float sizeTolerance = (2 - static_cast<float>(2.0f/3.0f)) * this->FA->cluster_rmsd;
-  
-    std::vector< std::vector< BindingMode >::iterator > lastModes;
+    // Output Population information ~= output clusters informations (*.cad)
+    
     
     // Looping through BindingModes
     int num_result = 0;
-    if(!nResults) nResults = this->get_Population_size() - 1; // if 0 is sent to this function, output all available results
-	for(std::vector<BindingMode>::iterator mode = this->BindingModes.begin(); mode != this->BindingModes.end() && nResults > 0; ++mode)
+    if(!nResults) nResults = this->get_Population_size() - 1; // if 0 is sent to this function, output all
+	for(std::vector<BindingMode>::iterator mode = this->BindingModes.begin(); mode != this->BindingModes.end() && nResults > 0; ++mode, --nResults, ++num_result)
 	{
-		// accept = true;
-		// for(std::vector<std::vector<BindingMode>::iterator>::iterator itMode = lastModes.begin(); itMode != lastModes.end(); ++itMode)
-		// {
-		// 	if(this->compute_distance((*itMode)->elect_Representative(false),mode->elect_Representative(false)) <= sizeTolerance)
-		// 	{
-		// 		accept = false;
-		// 		break;
-		// 	}
-		// }
-		if(accept)
-		{
-			mode->output_BindingMode(num_result, end_strfile, tmp_end_strfile, dockinp, gainp);
-	        mode->output_dynamic_BindingMode(num_result,end_strfile, tmp_end_strfile, dockinp, gainp);
-	         --nResults;
-	         ++num_result;
-	         lastModes.push_back(mode);
-        }
+		mode->output_BindingMode(num_result, end_strfile, tmp_end_strfile, dockinp, gainp, minPoints);
+        // mode->output_dynamic_BindingMode(num_result,end_strfile, tmp_end_strfile, dockinp, gainp, minPoints);
 	}
-	this->output_Population_energy(end_strfile, tmp_end_strfile);
 }
 
-// outputs the thermodynamic parameters of the BindingModes in BindingPopulation
-void BindingPopulation::output_Population_energy(char* end_strfile, char* tmp_end_strfile)
-{
-	char sufix[25];
-	FILE* outfile_ptr = NULL;
-	double complex_entropy = 0.0, complex_enthalpy = 0.0, complex_energy = 0.0, complex_minusTdS = 0.0;
-	double ligand_entropy = 0.0, ligand_enthalpy = 0.0, ligand_energy = 0.0, ligand_minusTdS = 0.0;
-	double solvated_complex_entropy = 0.0, solvated_complex_enthalpy = 0.0, solvated_complex_energy = 0.0, solvated_complex_minusTdS = 0.0;
 
-	// output filename processing
-	sprintf(sufix, ".energy");
-	strcpy(tmp_end_strfile, end_strfile);
-	strcat(tmp_end_strfile, sufix);
-	
-	if( !OpenFile_B(tmp_end_strfile, "w", &outfile_ptr) )
-	{
-		Terminate(6);
-	}
-	else
-	{
-		// 1. Prints HEADER to *.energy file
-		// fprintf(outfile_ptr, "%2s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%3s\n","#", "∆Gc", "∆Hc", "∆Sc", "-T∆Sc", "∆Gl", "∆Hl", "∆Sl", "-T∆Sl", "∆Gs", "∆Hs", "∆Ss", "-T∆Ss", "T");
-		fprintf(outfile_ptr, "%3s\t%10s\t%10s\t%10s\t%10s\t%3s\t%10s\t%10s\t%10s\t%10s\t%3s\t%10s\t%10s\t%10s\t%10s\t%3s\n","#∆c", "∆Gc", "∆Hc", "∆Sc", "-T∆Sc", "#∆l", "∆Gl", "∆Hl", "∆Sl", "-T∆Sl", "#∆s", "∆Gs", "∆Hs", "∆Ss", "-T∆Ss", "T");
-
-		for(std::vector<BindingMode>::const_iterator iMode = this->BindingModes.begin(); iMode != this->BindingModes.end() && ( iMode - this->BindingModes.begin() < this->FA->max_results ); ++iMode)
-		{
-			// The following 3 blocks of text use variables for clarity,
-			// there is otherwise no need to save these values priror to output
-			complex_energy = iMode->compute_complex_energy();				// ∆Gc
-			complex_enthalpy = iMode->compute_complex_enthalpy();			// ∆Hc
-			complex_entropy = iMode->compute_complex_entropy();				// ∆Sc
-			complex_minusTdS = -1 * complex_entropy * this->Temperature;	//-T∆Sc
-
-			ligand_energy = iMode->compute_free_ligand_energy();			// ∆Gl
-			ligand_enthalpy = iMode->compute_free_ligand_enthalpy();		// ∆Hl
-			ligand_entropy = iMode->compute_free_ligand_entropy();			// ∆Sl
-			ligand_minusTdS = -1 * ligand_entropy * this->Temperature;		//-T∆Sl
-
-			solvated_complex_energy = iMode->compute_solvated_complex_energy();				// ∆Gs
-			solvated_complex_enthalpy = iMode->compute_solvated_complex_enthalpy();			// ∆Hs
-			solvated_complex_entropy = iMode->compute_solvated_complex_entropy();			// ∆Ss
-			solvated_complex_minusTdS = -1 * solvated_complex_entropy * this->Temperature;	//-T∆Ss
-
-            
-            // Pose::iterator to Binding Mode reprentative
-            //  false : will use lowest CF
-            //   true : will use BindingMode's centroid
-            std::vector<Pose>::const_iterator iPose = iMode->elect_Representative(false);
-			
-			// prints BindingMode rank, energy, enthalpy, entropy, -T∆S and Temperature for the current BindingMode
-			fprintf(outfile_ptr, "%3ld\t%8.3f\t%8.3f\t%8.3f\t%8.3f\t%3ld\t%8.3f\t%8.3f\t%8.3f\t%8.3f\t%3ld\t%8.3f\t%8.3f\t%8.3f\t%8.3f\t%3d\n",
-				(iMode - this->BindingModes.begin()), complex_energy, complex_enthalpy, complex_entropy, complex_minusTdS,
-				this->rank_BindingMode_free_ligand_energy(iMode), ligand_energy, ligand_enthalpy, ligand_entropy, ligand_minusTdS,
-				this->rank_BindingMode_solvated_energy(iMode), solvated_complex_energy, solvated_complex_enthalpy, solvated_complex_entropy, solvated_complex_minusTdS,
-				this->Temperature);
-		}
-	}
-
-	CloseFile_B(&outfile_ptr,"w");
-}
-
-// returns a vectorized Chromosome from Internal Coordinates
-std::vector<float> BindingPopulation::Vectorized_Chromosome(chromosome* chrom)
-{
-    float norm = 0.0f;
-	std::vector<float> vChrom(this->nDimensions, 0.0f);
-	// getting nDim-2 because the Dim=0 fills 3 memory cases
-	for(int j = 0; j < this->nDimensions-2; ++j)
-	{
-		if(j == 0) //  building the first 3 comp. from genes[0] which are CartCoord x,y,z
-		{
-			for(int i = 0; i < 3; ++i)
-			{
-				// vChrom[i] = static_cast<float>(this->cleftgrid[static_cast<unsigned int>((*chrom).genes[j].to_ic)].coor[i] - this->FA->ori[i]);
-				if(i == 0)
-				{
-                    // vChrom[i] = static_cast<float>(this->cleftgrid[static_cast<unsigned int>((*chrom).genes[j].to_ic)].coor[i] - this->FA->ori[i]);
-					vChrom[i] = static_cast<float>(this->cleftgrid[static_cast<unsigned int>((*chrom).genes[j].to_ic)].dis);
-					// vChrom[i] *= vChrom[i];
-				}
-				if(i == 1)
-				{
-					// vChrom[i] = static_cast<float>(this->cleftgrid[static_cast<unsigned int>((*chrom).genes[j].to_ic)].coor[i] - this->FA->ori[i]);
-					vChrom[i] = static_cast<float>(this->cleftgrid[static_cast<unsigned int>((*chrom).genes[j].to_ic)].ang);
-					// vChrom[i] = static_cast<float>( RandomDouble( (*chrom).genes[j].to_int32) );
-					// vChrom[i] *= vChrom[i];
-				}
-				if(i == 2)
-				{
-                    // vChrom[i] = static_cast<float>(this->cleftgrid[static_cast<unsigned int>((*chrom).genes[j].to_ic)].coor[i] - this->FA->ori[i]);
-					vChrom[i] = static_cast<float>(this->cleftgrid[static_cast<unsigned int>((*chrom).genes[j].to_ic)].dih);
-					// vChrom[i] = static_cast<float>( genetoic(&this->gene_lim[i],(*chrom).genes[j].to_int32) );
-					// vChrom[i] *= vChrom[i];
-				}
-                norm += vChrom[i]*vChrom[i];
-			}
-		}
-		else
-		{
-			// j+2 is used from {j = 1 to N} to build further comp. of genes[j]
-			// vChrom[j+2] = static_cast<float>(genetoic(&gene_lim[j], (*chrom).genes[j].to_int32));
-			vChrom[j+2] = static_cast<float>((*chrom).genes[j].to_ic);
-			// vChrom[j+2] = static_cast<float>( RandomDouble( (*chrom).genes[j].to_int32) );
-            norm += vChrom[j+2]*vChrom[j+2];
-		}
-	}
-    
-  // norm = sqrtf(norm);
-  // for(int k = 0; k < this->nDimensions; ++k) { vChrom[k]/=norm; }
-   
-   return vChrom;
-}
-
-// returns a vectorized Chromosome from Cartesian Coordinates
-std::vector<float> BindingPopulation::Vectorized_Cartesian_Coordinates(int chrom_index)
-{
-	int i = 0,j = 0,l = 0,m = 0;
-	int cat;
-	int rot;
-
-	uint grd_idx;
-	int normalmode=-1;
-	int rot_idx=0;
-
-    std::vector<float> vChrom(this->nDimensions);
-
-	int npar = this->GB->num_genes;
-	
-	j = chrom_index;
-
-	for(i=0;i<npar;i++){ this->FA->opt_par[i] = this->chroms[j].genes[i].to_ic; }
-
-	for(i=0;i<npar;i++)
-	{
-		//printf("[%8.3f]",FA->opt_par[i]);
-  
-		if(this->FA->map_par[i].typ==-1) 
-		{ //by index
-			grd_idx = (uint)this->FA->opt_par[i];
-			//printf("this->FA->opt_par(index): %d\n", grd_idx);
-			//PAUSE;
-			this->atoms[this->FA->map_par[i].atm].dis = this->cleftgrid[grd_idx].dis;
-			this->atoms[this->FA->map_par[i].atm].ang = this->cleftgrid[grd_idx].ang;
-			this->atoms[this->FA->map_par[i].atm].dih = this->cleftgrid[grd_idx].dih;
-
-		}
-		else if(this->FA->map_par[i].typ == 0)
-		{
-			this->atoms[this->FA->map_par[i].atm].dis = (float)this->FA->opt_par[i];
-		}
-		else if(this->FA->map_par[i].typ == 1)
-		{
-			this->atoms[this->FA->map_par[i].atm].ang = (float)this->FA->opt_par[i];
-		}
-		else if(this->FA->map_par[i].typ == 2)
-		{
-			this->atoms[this->FA->map_par[i].atm].dih = (float)this->FA->opt_par[i];
-
-			j=this->FA->map_par[i].atm;
-			cat=this->atoms[j].rec[3];
-			if(cat != 0)
-			{
-				while(cat != this->FA->map_par[i].atm)
-				{
-					this->atoms[cat].dih=this->atoms[j].dih + this->atoms[cat].shift; 
-					j=cat;
-					cat=this->atoms[j].rec[3];
-				}
-			}
-		}else if(this->FA->map_par[i].typ == 3)
-		{ //by index
-			grd_idx = (uint)this->FA->opt_par[i];
-
-			// serves as flag , but also as grid index
-			normalmode=grd_idx;
-
-		}else if(this->FA->map_par[i].typ == 4)
-		{
-			rot_idx = (int)(this->FA->opt_par[i]+0.5);
-
-			this->residue[this->atoms[this->FA->map_par[i].atm].ofres].rot=rot_idx;
-		}
-  
-	}
-
-	if(normalmode > -1) alter_mode(this->atoms,this->residue,this->FA->normal_grid[normalmode],this->FA->res_cnt,this->FA->normal_modes);
-
-	/* rebuild cartesian coordinates of optimized residues*/
-    for(i=0;i<this->FA->nors;i++) buildcc(this->FA,this->atoms,this->FA->nmov[i],this->FA->mov[i]);
-
-	// residue that is optimized geometrically (ligand)
-	l=this->atoms[this->FA->map_par[0].atm].ofres;
-
-	rot=this->residue[l].rot;
-    m=0;
-	for(i=this->residue[l].fatm[rot];i<=this->residue[l].latm[rot];i++)
-	{
-		for(j=0;j<3;j++) vChrom[m*3+j] = this->atoms[i].coor[j];
-        ++m;
-	}
-	return vChrom;
-}
 
 /*****************************************\
 			  BindingMode
 \*****************************************/
 
 // public constructor *non-overloadable*
-BindingMode::BindingMode(BindingPopulation* pop) : Population(pop), isValid(true), energy(0.0) {}
+BindingMode::BindingMode(BindingPopulation* pop) : Population(pop), energy(0.0)
+{
+}
 
 
 // public method for pose addition
@@ -470,74 +69,8 @@ void BindingMode::add_Pose(Pose& pose)
 	this->Poses.push_back(pose);
 }
 
-bool BindingMode::isPoseAggregable(const Pose& pose) const
-{
-	bool accept = true;
-	float sizeTolerance = this->Population->FA->cluster_rmsd;
-	// float sizeTolerance = (2-static_cast<float>(2.0f/3.0f))*this->Population->FA->cluster_rmsd;
 
-	// automatically accep if the BindingMode is empty
-	if(!this->get_BindingMode_size()) return accept;
-	
-	for(std::vector<Pose>::const_iterator it = this->Poses.begin(); it != this->Poses.end(); ++it)
-	{
-		if( this->compute_distance((*it),pose) > sizeTolerance )
-		{
-			accept = false;
-			break;
-		}
-	}
-	
-	return accept;
-}
-
-bool BindingMode::isPoseInBindingMode(int chrom_index) const
-{
-	for(std::vector<Pose>::const_iterator iPose = this->Poses.begin(); iPose != this->Poses.end(); ++iPose)
-	{
-		if(iPose->chrom_index == chrom_index) return true;
-	}
-	return false;
-}
-
-bool BindingMode::isHomogenic() const
-{
-	bool accept = true;
-	float sizeTolerance = (2 - static_cast<float>(2.0f/3.0f)) * this->Population->FA->cluster_rmsd;
-	
-	for(std::vector<Pose>::const_iterator it1 = this->Poses.begin(); it1 != this->Poses.end(); ++it1)
-	{
-		for(std::vector<Pose>::const_iterator it2 = this->Poses.begin(); it2 != this->Poses.end(); ++it2)
-		{
-			if ((*it1) == (*it2)) continue;
-			else if( this->compute_distance((*it1),(*it2)) > sizeTolerance )
-			{	
-				accept = false;
-				break;
-			}
-		}
-		if(!accept) break;
-	}
-
-	return accept;
-}
-
-float BindingMode::compute_distance(const Pose& pose1, const Pose& pose2) const
-{
-	float distance = 0.0f;
-	// perform distance^2 calculation
-	for(int i = 0; i < pose1.vPose.size() && i < pose2.vPose.size(); ++i)
-	{
-		float temp = pose1.vPose[i] - pose2.vPose[i];
-		distance += temp * temp;
-	}
-	// return square-root of distance^2 divided by the number of atoms
-	return sqrtf(distance / static_cast<float>(this->Population->FA->num_het_atm));
-}
-
-/*###############################################*/
-
-double BindingMode::compute_complex_enthalpy() const
+double BindingMode::compute_enthalpy() const
 {
 	double enthalpy = 0.0;
 	// compute enthalpy
@@ -550,7 +83,7 @@ double BindingMode::compute_complex_enthalpy() const
 }
 
 
-double BindingMode::compute_complex_entropy() const
+double BindingMode::compute_entropy() const
 { 
 	double entropy = 0.0;
 	// compute entropy
@@ -559,177 +92,17 @@ double BindingMode::compute_complex_entropy() const
 		double boltzmann_prob = pose->boltzmann_weight / this->Population->PartitionFunction;
 		entropy += boltzmann_prob * log(boltzmann_prob);
 	}
-	
-	if( boost::math::isnan(entropy) )
-	{
-		entropy = 0.0;
-		return entropy;
-	}
-	else
-	{
-		// in order to respect Boltzmann entropy formula for a probabilities, we add the negative sign
-		// this is explained by the logarithm property where ln(W) = -ln(1/W)
-		return -entropy;
-	}
+	return -entropy; // returning a S value instead of ∆S value. Rendering it negative as in Shannon Entropy (no reference state)
 }
 
-double BindingMode::compute_complex_energy() const
+
+double BindingMode::compute_energy() const
 { 
-	double energy = ( this->compute_complex_enthalpy() - ( this->Population->Temperature * this->compute_complex_entropy() ) );
-	
-	// if energy isNaN, put energy to 0.0
-	// to avoid NaN in BindingModes enery
-	if(boost::math::isnan(energy)) energy = 0.0;
-	
-	return energy;
+	return ( this->compute_enthalpy() - ( this->Population->Temperature * this->compute_entropy() ) );
 }
 
-/*###############################################*/
 
-double BindingMode::compute_solvated_complex_enthalpy() const
-{
-	double solvated_enthalpy = 0.0;
-	// compute enthalpy
-	for(std::vector<Pose>::const_iterator pose = this->Poses.begin(); pose != this->Poses.end(); ++pose)
-	{
-		// Pis is approximated to be equivalent to Pi
-		// under the assumption that solvation will affect
-		// most poses in the BindingMode in the same way 
-		double boltzmann_prob = pose->solvated_boltzmann_weight / this->Population->SolvatedPartitionFunction;
-		// compute solvated complex enthalpy 
-		// ∆Hs = ∑ Pi * (CFi - CFl - CFt)
-        solvated_enthalpy += boltzmann_prob * ( pose->CF - pose->chrom->cf.ligsolv - pose->chrom->cf.tarsolv );
-	}
-	
-	return solvated_enthalpy;
-}
-
-double BindingMode::compute_solvated_complex_entropy() const
-{
-	double solvated_entropy = 0.0;
-	for(std::vector<Pose>::const_iterator pose = this->Poses.begin(); pose != this->Poses.end(); ++pose)
-	{
-		double boltzmann_prob = pose->solvated_boltzmann_weight / this->Population->SolvatedPartitionFunction;
-		solvated_entropy += boltzmann_prob * log(boltzmann_prob);
-	}
-	
-	if( boost::math::isnan(solvated_entropy) )
-	{
-		solvated_entropy = 0.0;
-		return solvated_entropy;
-	}
-	else
-	{
-		// in order to respect Boltzmann/Shannon entropy formula for a probabilities, we add the negative sign
-		// this is explained by the logarithm property where ln(W) = -ln(1/W)
-		return -solvated_entropy;
-	}
-}
-
-double BindingMode::compute_solvated_complex_energy() const
-{
-	// double energy = 0.0;
-    double solvated_energy = ( this->compute_solvated_complex_enthalpy() - ( this->Population->Temperature * this->compute_solvated_complex_entropy() ) );
-
-	// if solvated_energy isNaN, put solvated_energy to 0.0
-	// to avoid NaN in BindingModes enery
-	if(boost::math::isnan(solvated_energy)) solvated_energy = 0.0;
-	
-	return solvated_energy;
-}
-
-/*###############################################*/
-
-double BindingMode::compute_free_ligand_enthalpy() const
-{
-	double free_ligand_enthalpy = 0.0;
-	
-	// uses the representative to compute  ∆Hl
-     // std::vector<Pose>::const_iterator iPose = this->elect_Representative(false);
-	
-	// cf.sas is contact Lig-Sol in Complex
-	// cf.ligsolv is the area in contact with Lig-Prot in Complex
-	// which is now replaced by the value of the same area in contact with the solvent. 
-	// free_ligand_enthalpy = iPose->chrom->cf.sas + iPose->chrom->cf.ligsolv;
-	
-	// ~~ ∆Hl = Pl * ∆Hl(complete value) * nConformationsInSolution
-	// use the theoritical number of conformations of the free ligand ~ nflexbonds
-	// double boltzmann_weight = pow( E, ((-1.0) * (1/static_cast<double>(this->Population->Temperature)) * free_ligand_enthalpy ) );
-	// double boltzmann_prob = boltzmann_weight / ( this->Population->PartitionFunction + boltzmann_weight ) ;
-
-	// free_ligand_enthalpy = boltzmann_prob * free_ligand_enthalpy * this->Population->count_free_ligand_conformations();
-
-	// iterates Poses to compute the ∆Hl
-	for(std::vector<Pose>::const_iterator pose = this->Poses.begin(); pose != this->Poses.end(); ++pose)
-	{
-		// double boltzmann_weight = pow( E, ((-1.0) * (1/static_cast<double>(this->Population->Temperature)) * (pose->chrom->cf.sas + pose->chrom->cf.ligsolv) ) );
-		// double boltzmann_prob = boltzmann_weight / ( this->Population->PartitionFunction + boltzmann_weight ) ;
-		// free_ligand_enthalpy += boltzmann_prob * (pose->chrom->cf.sas + pose->chrom->cf.ligsolv);
-
-		double boltzmann_prob = pose->boltzmann_weight / this->Population->PartitionFunction;
-		free_ligand_enthalpy += boltzmann_prob * (pose->chrom->cf.sas + pose->chrom->cf.ligsolv);
-
-	}
-	
-	return this->compute_complex_enthalpy() - free_ligand_enthalpy;
-}
-
-double BindingMode::compute_free_ligand_entropy() const
-{
-	double free_ligand_entropy = 0.0;
-	// compute the boltzmann prob of a representative Pose
-	// ~~ ∆Sl = Pl * ln(Pl) * nConformationsInSolution
-	// use the theoritical number of conformations of the free ligand ~ nflexbonds
-	// std::vector<Pose>::const_iterator iPose = this->elect_Representative(false);
-	// double boltzmann_weight = pow( E, ((-1.0) * (1/static_cast<double>(this->Population->Temperature)) * (iPose->chrom->cf.sas + iPose->chrom->cf.ligsolv) ) );
-	// double boltzmann_prob = boltzmann_weight / ( this->Population->PartitionFunction + boltzmann_weight ) ;
-
- //   free_ligand_entropy = boltzmann_prob * log(boltzmann_prob) * this->Population->count_free_ligand_conformations();
-
-	// iterates Poses to compute the ∆Sl
-//    for(std::vector<Pose>::const_iterator pose = this->Poses.begin(); pose != this->Poses.end(); ++pose)
-//    {
-		// double boltzmann_weight = pow( E, ((-1.0) * (1/static_cast<double>(this->Population->Temperature)) * (pose->chrom->cf.sas + pose->chrom->cf.ligsolv) ) );
-		// double boltzmann_prob = boltzmann_weight / ( this->Population->PartitionFunction + boltzmann_weight ) ;
-
-		// double boltzmann_prob = pose->boltzmann_weight / this->Population->PartitionFunction;
-		// free_ligand_entropy += boltzmann_prob * log(boltzmann_prob);
-//    }
-
-    free_ligand_entropy = (this->compute_partition_function() / this->Population->PartitionFunction) * log(this->Population->count_free_ligand_conformations());
-
-	if( boost::math::isnan(free_ligand_entropy) )
-	{
-		free_ligand_entropy = 0.0;
-		return this->compute_complex_entropy() - free_ligand_entropy;
-	}
-	else
-	{
-		// in order to respect Boltzmann/Shannon entropy formula for a probabilities, we add the negative sign
-		// this is explained by the logarithm property where ln(W) = -ln(1/W)
-		// return -free_ligand_entropy;
-		// 
-		// returns log(nConfs) - free_ligand_entropy found in BindingMdoe (free_ligand_entropy should be renamed)
-	   	// return  -free_ligand_entropy;
-	   	return  this->compute_complex_entropy() - free_ligand_entropy;
-	}
-}
-
-double BindingMode::compute_free_ligand_energy() const
-{
-	// double energy = 0.0;
-	double energy = ( this->compute_free_ligand_enthalpy() - ( this->Population->Temperature * this->compute_free_ligand_entropy() ) );
-
-	// if energy isNaN, put energy to 0.0
-	// to avoid NaN in BindingModes enery
-	if(boost::math::isnan(energy)) energy = 0.0;
-	
-	return energy;
-}
-
-/*###############################################*/
-
-int BindingMode::get_BindingMode_size() const { return static_cast<int>(this->Poses.size()); }
+int BindingMode::get_BindingMode_size() const { return this->Poses.size(); }
 
 
 void BindingMode::clear_Poses() { this->Poses.clear(); }
@@ -737,48 +110,11 @@ void BindingMode::clear_Poses() { this->Poses.clear(); }
 
 void BindingMode::set_energy()
 {
-	this->energy = this->compute_complex_energy();
+	this->energy = this->compute_energy();
 }
 
 
-std::vector<float> BindingMode::compute_centroid() const
-{
-    Pose mPose(*this->elect_Representative(false));
-    unsigned int size = static_cast<unsigned int>( mPose.vPose.size() );
-    std::vector<float> vCentroid( size, 0.0f );
-    // partition_function below is a PF for a subpopulation of a BindingMode
-    double partition_function = this->compute_partition_function();
-    
-    for(std::vector<Pose>::const_iterator iPose = this->Poses.begin(); iPose != this->Poses.end(); ++iPose)
-    {
-    	for(unsigned int i = 0; i < size; ++i)
-    	{
-    		// formula c = ∑(MiVi)
-    		// Mi = e^(-ßCF) / ∑(e^(-ßCF))
-    		// Vi = cartesian coordinates vector
-    		// Abdi, H. Centroid, center of gravity, center of mass, barycenter. (Encyclopedia of measurement and statistics. Thousand …, 2007). doi:10.1002/wics.031
-    		vCentroid[i] += ( iPose->boltzmann_weight / partition_function ) * iPose->vPose[i];
-    	}
-    }
-
-    return vCentroid;
-}
-
-double BindingMode::compute_partition_function() const
-{
-	double partition_function = 0.0;
-	// double temperature = static_cast<double>(this->Population->Temperature);
-
-	// compute the current partition function of the BindingMode
-	for(std::vector<Pose>::const_iterator it = this->Poses.begin(); it != this->Poses.end(); ++it)
-	{
-		partition_function += it->boltzmann_weight;
-	}
-
-	return partition_function;
-}
-
-void BindingMode::output_BindingMode(int num_result, char* end_strfile, char* tmp_end_strfile, char* dockinp, char* gainp)
+void BindingMode::output_BindingMode(int num_result, char* end_strfile, char* tmp_end_strfile, char* dockinp, char* gainp, int minPoints)
 {
     // File and Output variables declarations
     cfstr CF; /* complementarity function value */
@@ -791,17 +127,21 @@ void BindingMode::output_BindingMode(int num_result, char* end_strfile, char* tm
 	
     // 0. elect a Pose representative (Rep) of the current BindingMode
 	std::vector<Pose>::const_iterator Rep_lowCF = this->elect_Representative(false);
-	std::vector<Pose>::const_iterator Rep_Centroid = this->elect_Representative(true);
+	std::vector<Pose>::const_iterator Rep_lowOPTICS = this->elect_Representative(true);
 	
     // 1. build FA->opt_par[GB->num_genes]
 	 for(int k = 0; k < this->Population->GB->num_genes; ++k) this->Population->FA->opt_par[k] = Rep_lowCF->chrom->genes[k].to_ic;
-	 // for(int k = 0; k < this->Population->GB->num_genes; ++k) this->Population->FA->opt_par[k] = Rep_Centroid->chrom->genes[k].to_ic;
+	 // for(int k = 0; k < this->Population->GB->num_genes; ++k) this->Population->FA->opt_par[k] = Rep_lowOPTICS->chrom->genes[k].to_ic;
 
 	// 2. get CF with ic2cf() 
 	CF = ic2cf(this->Population->FA, this->Population->VC, this->Population->atoms, this->Population->residue, this->Population->cleftgrid, this->Population->GB->num_genes, this->Population->FA->opt_par);
 	
     // 3. print REMARKS for FA->optres (res_ptr && cf_ptr for each optimizable residue)
 	strcpy(remark,"REMARK optimized structure\n");
+	
+	 sprintf(tmpremark,"REMARK Fast OPTICS clustering algorithm used to output the lowest CF as Binding Mode representative\n");
+	 // sprintf(tmpremark,"REMARK Fast OPTICS clustering algorithm used to output the lowest OPTICS ordering as Binding Mode representative\n");
+	strcat(remark,tmpremark);
 	
 	sprintf(tmpremark,"REMARK CF=%8.5f\n",get_cf_evalue(&CF));
 	strcat(remark,tmpremark);
@@ -829,7 +169,7 @@ void BindingMode::output_BindingMode(int num_result, char* end_strfile, char* tm
 	}
     
     sprintf(tmpremark,"REMARK Binding Mode:%d Best CF in Binding Mode:%8.5f OPTICS Center (CF):%8.5f Binding Mode Total CF:%8.5f Binding Mode Frequency:%d\n",
-            num_result, Rep_lowCF->CF, Rep_Centroid->CF, this->compute_complex_energy(), this->get_BindingMode_size());
+            num_result, Rep_lowCF->CF, Rep_lowOPTICS->CF, this->compute_energy(), this->get_BindingMode_size());
     strcat(remark,tmpremark);
     for(int j=0; j < this->Population->FA->npar; ++j)
 	{
@@ -844,7 +184,6 @@ void BindingMode::output_BindingMode(int num_result, char* end_strfile, char* tm
 		sprintf(tmpremark,"REMARK %8.5f RMSD to ref. structure (no symmetry correction)\n",
 		calc_rmsd(this->Population->FA,this->Population->atoms,this->Population->residue,this->Population->cleftgrid,this->Population->FA->npar,this->Population->FA->opt_par, Hungarian));
 		strcat(remark,tmpremark);
-		
 		Hungarian = true;
 		sprintf(tmpremark,"REMARK %8.5f RMSD to ref. structure     (symmetry corrected)\n",
 		calc_rmsd(this->Population->FA,this->Population->atoms,this->Population->residue,this->Population->cleftgrid,this->Population->FA->npar,this->Population->FA->opt_par, Hungarian));
@@ -852,7 +191,7 @@ void BindingMode::output_BindingMode(int num_result, char* end_strfile, char* tm
 	}
 	sprintf(tmpremark,"REMARK inputs: %s & %s\n",dockinp,gainp);
 	strcat(remark,tmpremark);
-	sprintf(sufix,"_%d.pdb", num_result);
+	sprintf(sufix,"_%d_%d.pdb", minPoints, num_result);
 	strcpy(tmp_end_strfile,end_strfile);
 	strcat(tmp_end_strfile,sufix);
 	// 5. write_pdb(FA,atoms,residue,tmp_end_strfile,remark)
@@ -860,25 +199,18 @@ void BindingMode::output_BindingMode(int num_result, char* end_strfile, char* tm
 }
 
 
-void BindingMode::output_dynamic_BindingMode(int num_result, char* end_strfile, char* tmp_end_strfile, char* dockinp, char* gainp)
+void BindingMode::output_dynamic_BindingMode(int num_result, char* end_strfile, char* tmp_end_strfile, char* dockinp, char* gainp, int minPoints)
 {
     // File and Output variables declarations
     cfstr CF; /* complementarity function value */
-    resid* pRes = NULL;
-    cfstr* pCF  = NULL;
-    
+    resid *pRes = NULL;
+    cfstr* pCF = NULL;
+
     char sufix[25];
     char remark[MAX_REMARK];
     char tmpremark[MAX_REMARK];
     int nModel = 1;
-    int maxModels = 999;
-
-    // sort the Poses by lowest CF or highest Boltzmann_weight (if equal) or lowest chrom_index (if equal again)
-    // std::sort(this->Poses.begin(), this->Poses.end(), PoseRanker());
-    // random shuffling the Poses
-    std::random_shuffle(this->Poses.begin(), this->Poses.end());
-    
-    for(std::vector<Pose>::iterator Pose = this->Poses.begin(); Pose != this->Poses.end() && nModel < maxModels; ++Pose, ++nModel)
+    for(std::vector<Pose>::iterator Pose = this->Poses.begin(); Pose != this->Poses.end(); ++Pose, ++nModel)
     {
     	// 1. build FA->opt_par[GB->num_genes]
 		for(int k = 0; k < this->Population->GB->num_genes; ++k) this->Population->FA->opt_par[k] = Pose->chrom->genes[k].to_ic;
@@ -888,6 +220,10 @@ void BindingMode::output_dynamic_BindingMode(int num_result, char* end_strfile, 
 		
 	    // 3. print REMARKS for FA->optres (res_ptr && cf_ptr for each optimizable residue)
 		strcpy(remark,"REMARK optimized structure\n");
+		
+	//	 sprintf(tmpremark,"REMARK Fast OPTICS clustering algorithm used to output the lowest CF as Binding Mode representative\n");
+		 sprintf(tmpremark,"REMARK Fast OPTICS clustering algorithm used to output the lowest OPTICS ordering as Binding Mode representative\n");
+		strcat(remark,tmpremark);
 		
 		sprintf(tmpremark,"REMARK CF=%8.5f\n",get_cf_evalue(&CF));
 		strcat(remark,tmpremark);
@@ -935,118 +271,51 @@ void BindingMode::output_dynamic_BindingMode(int num_result, char* end_strfile, 
 		sprintf(tmpremark,"REMARK inputs: %s & %s\n",dockinp,gainp);
 		strcat(remark,tmpremark);
         
-		sprintf(sufix,"_MODEL_%d.pdb", num_result);
+		sprintf(sufix,"_%d_MODEL_%d.pdb", minPoints, num_result);
 		strcpy(tmp_end_strfile,end_strfile);
 		strcat(tmp_end_strfile,sufix);
 		// 5. write_pdb(FA,atoms,residue,tmp_end_strfile,remark)
 		if(Pose == this->Poses.begin() && Pose+1 == this->Poses.end())
 		{
-			// case where there is a single pose
 			write_MODEL_pdb(true, true, nModel, this->Population->FA,this->Population->atoms,this->Population->residue,tmp_end_strfile,remark);
 		}
 		else if(Pose == this->Poses.begin())
 		{
-			// case where this is the first of multiple poses
 			write_MODEL_pdb(true, false, nModel, this->Population->FA,this->Population->atoms,this->Population->residue,tmp_end_strfile,remark);
 		}
-		else if(Pose+1 == this->Poses.end() || (nModel+1) == maxModels)
+		else if(Pose+1 == this->Poses.end())
 		{
-			// case where this is the last of mulpile pose
 			write_MODEL_pdb(false, true, nModel, this->Population->FA,this->Population->atoms,this->Population->residue,tmp_end_strfile,remark);
 		}
 		else
 		{
-			// any pose between the first and the last of multiple poses
 			write_MODEL_pdb(false, false, nModel, this->Population->FA,this->Population->atoms,this->Population->residue,tmp_end_strfile,remark);
 		}
     }
 }
 
-std::vector<Pose>::const_iterator BindingMode::elect_Representative(bool useCentroid) const
+std::vector<Pose>::const_iterator BindingMode::elect_Representative(bool useOPTICSorder) const
 {
-	// double meanCF = 0.0; // will be used to compute the mean CF
-	float deltaDist = 999.9f;	// will be used to find the closest representative to the centroid
-	float dist = 0.0f;		// will be used to find the closest representative to the centroid
-	// double diffCF = 9999.99;// wiil be used to remember the closest difference between the CF of a Pose and the MEAN CF of the BindingMode
-
-	// Rep is the const_iterator returned by this function
 	std::vector<Pose>::const_iterator Rep = this->Poses.begin();
-	
-    if(useCentroid) // use either Centroid or the CF which is closest to the mean CF of the BindingMode
+	for(std::vector<Pose>::const_iterator it = this->Poses.begin(); it != this->Poses.end(); ++it)
 	{
-        // use the CF closest to the mean CF as a representative
-		// BLOCK OF CODE USED TO FIND THE REPRESENTATIVE CLOSEST TO THE MEAN CF
-		// for(std::vector<Pose>::const_iterator it = this->Poses.begin(); it != this->Poses.end(); ++it) meanCF += it->CF;
-
-		// meanCF /= static_cast<double>(this->Poses.size()); // divide the sum of CF by the number of poses
-		// for(std::vector<Pose>::const_iterator it = this->Poses.begin(); it != this->Poses.end(); ++it)
-		// {
-		// 	// if the difference between the CF of the current Pose (it) and meanCF (in absolute value) is lower than the one of Rep
-		// 	if( fabs(it->CF - meanCF) < diffCF )
-		// 	{
-		// 		// then save current pose in Rep, and its CF difference to meanCF in diffCF
-		// 		Rep = it;
-		// 		diffCF = fabs(it->CF - meanCF);
-		// 	}
-		// }
-
-
-		// BLOCK OF CODE USED TO FIND THE REPRESENTATIVE CLOSEST TO THE CENTROID
-		std::vector<float> Centroid = this->compute_centroid();
-		for(std::vector<Pose>::const_iterator it = this->Poses.begin(); it != this->Poses.end(); ++it)
-		{
-			dist = this->Population->compute_vec_distance(it->vPose, Centroid);
-			if(dist < deltaDist)
-			{
-				Rep = it;
-				deltaDist = dist;
-			}
-		}
+		if(!useOPTICSorder && (Rep->CF - it->CF) > DBL_EPSILON ) Rep = it;
+		if(useOPTICSorder && it->reachDist < Rep->reachDist && !isUndefinedDist(it->reachDist)) Rep = it;
 	}
-	
-	else // use the BEST CF as representative
-	{
-		for(std::vector<Pose>::const_iterator it = this->Poses.begin(); it != this->Poses.end(); ++it)
-		{
-			if( (Rep->CF - it->CF) > DBL_EPSILON ) Rep = it;
-		}
-	}
-	
-	// return the representative of the BindingMode
 	return Rep;
 }
 
 
-inline bool const BindingMode::operator< (const BindingMode& rhs) { return ( (this->compute_complex_energy() - rhs.compute_complex_energy()) < DBL_EPSILON ? true : false ); }
+inline bool const BindingMode::operator< (const BindingMode& rhs) { return (this->compute_energy() < rhs.compute_energy()); }
 
-inline bool const BindingMode::operator==(const BindingMode& rhs)
-{
-	if( this->get_BindingMode_size() == rhs.get_BindingMode_size() && this->elect_Representative(false) == rhs.elect_Representative(false) )
-	{
-		return true;
-	}
-	else return false;
-}
-
-inline bool const operator==(const BindingMode& lhs, const BindingMode& rhs)
-{
-	if(lhs.get_BindingMode_size() == rhs.get_BindingMode_size() && lhs.elect_Representative(false) == rhs.elect_Representative(false) )
-	{
-		return true;
-	}
-	else return false;
-}
 
 /*****************************************\
 				  Pose
 \*****************************************/
 // public constructor for Pose *non-overloadable*
-Pose::Pose(chromosome* chrom, int index, int iorder, float dist, uint temperature, std::vector<float> vec) :  chrom_index(index), order(iorder), reachDist(dist), chrom(chrom), CF(chrom->app_evalue), CFdS(0.0), vPose(vec), processed(false)
+Pose::Pose(chromosome* chrom, int index, int iorder, float dist, uint temperature, std::vector<float> vec) : chrom(chrom), order(iorder), chrom_index(index), reachDist(dist), CF(chrom->app_evalue), vPose(vec)
 {
 	this->boltzmann_weight = pow( E, ((-1.0) * (1/static_cast<double>(temperature)) * chrom->app_evalue) );
-	// this->solvated_boltzmann_weight = pow( E, ((-1.0) * (1/static_cast<double>(temperature)) * ( chrom->app_evalue - chrom->cf.ligsolv )) );
-	this->solvated_boltzmann_weight = pow( E, ((-1.0) * (1/static_cast<double>(temperature)) * ( chrom->app_evalue - chrom->cf.ligsolv - chrom->cf.tarsolv )) );
-    // this->CFdS += this->boltzmann_weight;
 }
 
 Pose::~Pose(){}
@@ -1062,37 +331,5 @@ inline bool const Pose::operator< (const Pose& rhs)
 	if(this->chrom_index < rhs.chrom_index) return true;
 	else if(this->chrom_index > rhs.chrom_index) return false;
 	
-	else return false;
-}
-
-inline bool const Pose::operator> (const Pose& rhs)
-{
-	if(this->order < rhs.order) return false;
-   	else if(this->order > rhs.order) return true;
-	
-	if(this->reachDist < rhs.reachDist) return false;
-	else if(this->reachDist > rhs.reachDist) return true;
-	
-	if(this->chrom_index < rhs.chrom_index) return false;
-	else if(this->chrom_index > rhs.chrom_index) return true;
-	
-	else return false;
-}
-
-inline bool const Pose::operator==(const Pose& rhs)
-{
-	if(this->chrom_index == rhs.chrom_index) return true;
-	else return false;
-}
-
-inline bool const operator==(const Pose& lhs, const Pose& rhs)
-{
-	if(lhs.chrom_index == rhs.chrom_index) return true;
-	else return false;
-}
-
-int roll_die()
-{
-    boost::random::uniform_int_distribution<> dist(0, MAX_RANDOM_VALUE);
-    return dist(gen);
+	return false;
 }

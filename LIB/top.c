@@ -162,17 +162,6 @@ int main(int argc, char **argv){
     strcpy(FA->vcontacts_self_consistency,"MAX");
 	FA->vcontacts_planedef = 'X';
 	
-	// the verification below is added to insure that an output name is given in argument to FlexAID
-	if(!argv[1])
-	{
-		fprintf(stderr, "ERROR: please define a configuration file as first (1st) argument given to FlexAID. The configuration file will be used to define the molecular docking simulation parameters.\n");
-		Terminate(0);
-	}
-	else if(!argv[2])
-	{
-		fprintf(stderr, "ERROR: please define an optimization algorithm configuration file as second (2nd) argument given to FlexAID. This file will be used for genetic algorithm optimization parameters.\n");
-		Terminate(0);
-	}
 	// Linux path
 	pch=strrchr(argv[0],'\\');
 	if(pch==NULL) 
@@ -199,12 +188,6 @@ int main(int argc, char **argv){
   
 	strcpy(dockinp,argv[1]);
 	strcpy(gainp,argv[2]);
-	// the verification below is added to insure that an output name is given in argument to FlexAID
-	if(!argv[3])
-	{
-		fprintf(stderr, "ERROR: please define a simulation name as third argument given to FlexAID. The simulation name will be used for results files.\n");
-		Terminate(0);
-	}
 	strcpy(end_strfile,argv[3]);
 	strcpy(FA->rrgfile,end_strfile);
 
@@ -406,7 +389,7 @@ int main(int argc, char **argv){
 		sprintf(tmpremark,"REMARK [%8.3f]\n",FA->opt_par[i]);
 		strcat(remark,tmpremark);
 	}
-	sprintf(tmpremark,"REMARK inputs: %s & %s\n",dockinp,gainp);
+	sprintf(tmpremark,"REMARK inputs: %s & %s",dockinp,gainp);
 	strcat(remark,tmpremark);
 	
 	write_pdb(FA,atoms,residue,tmp_end_strfile,remark);
@@ -492,34 +475,21 @@ int main(int argc, char **argv){
             
 			printf("n_chrom_snapshot=%d\n", n_chrom_snapshot);
 
-			if( strcmp(FA->clustering_algorithm,"FO") == 0 )
-			{
-				printf("using the Fast OPTICS (FO) density based clustering algorithm.\n");
-				FastOPTICS_cluster(FA,GB,VC,chrom_snapshot,gene_lim,atoms,residue,cleftgrid,n_chrom_snapshot,end_strfile,tmp_end_strfile,dockinp,gainp);
-			}
-			else if( strcmp(FA->clustering_algorithm,"CE") == 0 )
-			{
-				printf("using the Colony Energy (CE) entropy evaluation algorithm.\n");
-				ColonyEnergy_cluster(FA,GB,VC,chrom_snapshot,gene_lim,atoms,residue,cleftgrid,n_chrom_snapshot,end_strfile,tmp_end_strfile,dockinp,gainp);
-			}
-			else if( strcmp(FA->clustering_algorithm,"DP") == 0 )
-			{
-				printf("using the Density Peak (DP) based clustering algorithm.\n");
-				DensityPeak_cluster(FA,GB,VC,chrom_snapshot,gene_lim,atoms,residue,cleftgrid,n_chrom_snapshot,end_strfile,tmp_end_strfile,dockinp,gainp);
-			}
-			else if(FA->temperature) //used to differentiate between old entropy implementation in cluster() from entropy_cluster() using Binding Modes
-			{
-				printf("using the entropy (dS) density based clustering algorithm.\n");
-				entropy_cluster(FA,GB,VC,chrom_snapshot,gene_lim,atoms,residue,cleftgrid,n_chrom_snapshot,end_strfile,tmp_end_strfile,dockinp,gainp);
-
-				// # call to cluster() below used for comparison purposes
-				// cluster(FA,GB,VC,chrom_snapshot,gene_lim,atoms,residue,cleftgrid,n_chrom_snapshot,end_strfile,tmp_end_strfile,dockinp,gainp);
-			}
-			else
-			{
-				printf("using the Complementarity Function (CF) similarity based algorithm.\n");
+			// if( strcmp(FA->clustering_algorithm,"FO") == 0 )
+			// {
+			// 	printf("using the Fast OPTICS (FO) density based clustering algorithm.\n");
+			// 	FastOPTICS_cluster(FA,GB,VC,chrom_snapshot,gene_lim,atoms,residue,cleftgrid,n_chrom_snapshot,end_strfile,tmp_end_strfile,dockinp,gainp);
+			// }
+			// else if( strcmp(FA->clustering_algorithm,"DP") == 0 )
+			// {
+			// 	printf("using the Density Peak (DP) based clustering algorithm.\n");
+			// 	DensityPeak_cluster(FA,GB,VC,chrom_snapshot,gene_lim,atoms,residue,cleftgrid,n_chrom_snapshot,end_strfile,tmp_end_strfile,dockinp,gainp);
+			// }
+			// else
+			// {
+				printf("using the Complementarity Function (CF) based clustering algorithm.\n");
 				cluster(FA,GB,VC,chrom_snapshot,gene_lim,atoms,residue,cleftgrid,n_chrom_snapshot,end_strfile,tmp_end_strfile,dockinp,gainp);
-			}
+			// }
 			//////////////////////////////////////////
 			// Looking at cleftgrid chrom's density //
 			//////////////////////////////////////////

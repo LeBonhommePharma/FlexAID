@@ -2,6 +2,8 @@
 #include "boinc.h"
 #include "maps.hpp"
 
+using namespace std;
+
 /*******************************************/
 /*  generates a grid from the spheres of 
     loccen or spheres combination from
@@ -13,7 +15,7 @@ gridpoint* generate_grid(FA_Global* FA,sphere* spheres, atom* atoms, resid* resi
 	float sqrrad;
 	float c[3], min[3], max[3];
 	gridpoint* cleftgrid = NULL;
-	std::map<std::string,int> cleftgrid_map;
+	map<string,int> cleftgrid_map;
 
 	cleftgrid = (gridpoint*)malloc(FA->MIN_CLEFTGRID_POINTS*sizeof(gridpoint));    
 	if (cleftgrid == NULL){
@@ -65,7 +67,7 @@ gridpoint* generate_grid(FA_Global* FA,sphere* spheres, atom* atoms, resid* resi
 
 					if(sqrdist(spheres->center,c) < sqrrad){
 						
-						std::string key = get_key(c);
+						string key = get_key(c);
 						
 						if(cleftgrid_map.find(key) == cleftgrid_map.end()){							
 							if (FA->num_grd==FA->MIN_CLEFTGRID_POINTS){
@@ -83,7 +85,7 @@ gridpoint* generate_grid(FA_Global* FA,sphere* spheres, atom* atoms, resid* resi
 							cleftgrid[FA->num_grd].coor[2] = c[2];
 							
 							FA->num_grd++;
-                            cleftgrid_map.insert(std::pair<std::string,int>(key, FA->num_grd));
+							cleftgrid_map.insert(pair<string,int>(key, FA->num_grd));
 
 						}
 

@@ -1,7 +1,7 @@
 #################################################################
-#      Makefile for the FlexAID program (Linux Version)         #
+# Makefile for the FlexAID program (Linux Version)              #
 #                                                               #
-#         Louis-Philippe Morency & Rafael Najmanovich           #
+# Francis Gaudreault & Rafael Najmanovich                       #
 #                                                               #
 #################################################################
 
@@ -24,13 +24,10 @@ ifeq ($(DEBUG),1)
 endif
 
 # BOOST Installation path
-BOOST_INCLUDES = /usr/local/Cellar/boost/1.58.0/
-#BOOST_INCLUDES = /home/francis/boost_1_53_0
-#BOOST_INCLUDES = /usr/include/boost
+BOOST_INCLUDES = /home/francis/boost_1_53_0
 
 # BOINC Installation path
-BOINC_BUILD = /home/boincadm/boinc
-#BOINC_BUILD = /home/boincadm/boinc-src
+BOINC_BUILD = /home/francis/boinc
 
 LIBDIRS = 
 LIBS = 
@@ -270,7 +267,7 @@ calc_rmsd_chrom.o: $I/calc_rmsd_chrom.c $I/flexaid.h
 	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/calc_rmsd_chrom.c $(INCLUDES)
 
 calc_rmsd.o: $I/calc_rmsd.c $I/flexaid.h
-	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/calc_rmsd.c $(INCLUDES)
+	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/calc_rmsd.c
 
 write_rrd.o: $I/write_rrd.c $I/flexaid.h $I/gaboom.h $I/boinc.h
 	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/write_rrd.c $(INCLUDES)

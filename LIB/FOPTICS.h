@@ -2,7 +2,6 @@
 #define FOPTICS_H
 
 #include "BindingMode.h"
-#include <typeinfo>
 #include <utility>
 #include <iostream>
 #include <sstream> // for ostringstream
@@ -12,8 +11,9 @@
 #include <cmath>
 
 
-
-// random die &&  Float comparators
+int roll_die();
+int roll_rand_die();
+// Float comparators
 bool definitelyGreaterThan(float a, float b, float epsilon);
 bool definitelyLessThan(float a, float b, float epsilon);
 
@@ -38,77 +38,50 @@ struct ClusterOrderingComparator
 	// inline int operator() ( const ClusterOrdering& pose1, const ClusterOrdering& pose2 )
 	inline bool operator() ( const ClusterOrdering& pose1, const ClusterOrdering& pose2 )
 	{
+		// if(pose1.reachability > pose2.reachability)
+		// 	return 1;
+		// else if(pose1.reachability < pose2.reachability)
+		// 	return -1;
+		// if(pose1.objectID > pose2.objectID)
+		// 	return -1;
+		// else if(pose1.objectID < pose2.objectID)
+		// 	return 1;
+
 		if(pose1.reachability > pose2.reachability || isUndefinedDist(pose1.reachability))
 			return true;
 		else if(pose1.reachability < pose2.reachability)
 			return false;
-
-		// if(pose1.predecessorID > pose2.predecessorID)
-		// 	return true;
-		// else if(pose1.predecessorID < pose2.predecessorID)
-		// 	return false;
-
 		if(pose1.objectID > pose2.objectID)
 			return false;
 		else if(pose1.objectID < pose2.objectID)
 			return true;
 
 		// if nothing else is true, return 0
-		return false;
+		return 0;
 	}
 };
-
-// priority_queue container alllowing iterations throughtout the priority_queue
-template <class T, class S, class C>S& Container(std::priority_queue<T, S, C>& q)
-{
-    struct IterableQueue : private std::priority_queue<T, S, C>
-    {
-        static S& Container(std::priority_queue<T, S, C>& q)
-        {
-            return q.*&IterableQueue::c;
-        }
-    };
-    return IterableQueue::Container(q);
-}
 
 /*****************************************\
 				FastOPTICS
 \*****************************************/
 class FastOPTICS
 {
-	// multiple random projections partitioning algorithm-related class
-	friend class RandomProjectedNeighborsFOPTICS;
-	// entropy-related classes to integrate with FlexAID
-	friend class BindingMode;
-    friend class BindingPopulation;
+	friend class RandomProjectedNeighborsAndDensities;
 	
 	public:
-		// Constructor (publicly called from FlexAID's *_cluster.cxx)
-		explicit 	FastOPTICS(FA_Global* FA, GB_Global* GB, VC_Global* VC, chromosome* chrom, genlim* gen_lim, atom* atoms, resid* residue, gridpoint* cleftgrid, int nChrom, BindingPopulation&, int nPoints);
-		// Main FastOPTICS function to execute the algorithm
+		explicit 	FastOPTICS(FA_Global* FA, GB_Global* GB, VC_Global* VC, chromosome* chrom, genlim* gen_lim, atom* atoms, resid* residue, gridpoint* cleftgrid, int nChrom, BindingPopulation&, int nPoints); // Constructor (publicly called from FlexAID's *_cluster.cxx)
 		void 		Execute_FastOPTICS(char* end_strfile, char* tmp_end_strfile);
-		// void		update_ClusterOrdering_PriorityQueue_elements(int, std::priority_queue< ClusterOrdering, std::vector<ClusterOrdering>, ClusterOrderingComparator::ClusterOrderingComparator > &);
-		
-		// population classification methods (linked to BindingPopulation* Population)
-				// 	classify the Pose into the appropriate BindingMode in the BindingPopulation
-		bool 		Classify_Pose(Pose& pose);
-				// 	classify the whole BindingPopulation into BindingModes (this method might call Classify_Pose())
-		void 		Classify_Population();
-		// output-related methods
         void 		output_OPTICS(char* end_strfile, char* tmp_end_strfile);
         void 		output_3d_OPTICS_ordering(char* end_strfile, char* tmp_end_strfile);
-        // distance computing methods
 		float 		compute_distance(std::pair< chromosome*,std::vector<float> > &, std::pair< chromosome*,std::vector<float> > &);
 		float 		compute_vect_distance(std::vector<float> a, std::vector<float> b);
-		// getters methods
 		int 		get_minPoints();
 
 	private:
 		// FlexAID specific attributes
-		int 	N;				// N : number of chromosomes to cluster
-		int 	minPoints;		// minPts : minimal number of neighbors (only parameter in FOPTICS)
-		int 	nDimensions;	// number of dimensions of the vectorized Pose
-		float 	dist_threshold; // contains the value of this->FA->cluster_rmsd*(2 - RandomProjectedNeighborsFOPTICS::sizeTolerance)
+		int N;			// N : number of chromosomes to cluster
+		int minPoints;	// minPts : minimal number of neighbors (only parameter in FOPTICS)
+		int nDimensions;
 		
 		// FOPTICS algorithm attributes
 		int iOrder;
@@ -120,7 +93,7 @@ class FastOPTICS
 		std::vector< std::vector< int > > neighbors;
         
         std::vector< Pose > OPTICS;
-        
+        // std::priority_queue< Pose, std::vector<Pose>, PoseClassifier::PoseClassifier > OPTICS;
 		// BindingPopulation is used for clustering purposed
 		BindingPopulation* Population;
 		
@@ -130,8 +103,8 @@ class FastOPTICS
 	
 	
 	protected:
-		// protected methods to be used by RandomProjectedNeighborsFOPTICS::methods()
-			  	 FA_Global* FA;		// pointer to FA_Global struct
+		// protected methods to be used by RandomProjectedNeighborsAndDensities::methods()
+			  FA_Global* FA;		// pointer to FA_Global struct
 		/*const*/GB_Global* GB;		// pointer to GB_Global struct
 		/*const*/VC_Global* VC;		// pointer to VC_Global struct
 		/*const*/chromosome* chroms;	// pointer to chromosomes' array
@@ -146,12 +119,12 @@ class FastOPTICS
 /*****************************************\
 			RandomProjections
 \*****************************************/
-class RandomProjectedNeighborsFOPTICS
+class RandomProjectedNeighborsAndDensities
 {
 	friend class FastOPTICS;
 	
 	public:
-		explicit RandomProjectedNeighborsFOPTICS(std::vector< std::pair< chromosome*,std::vector<float> > >&, int, FastOPTICS*); // Constructor (publicly called from FlexAID *_cluster.cxx)
+		explicit RandomProjectedNeighborsAndDensities(std::vector< std::pair< chromosome*,std::vector<float> > >&, int, FastOPTICS*); // Constructor (publicly called from FlexAID *_cluster.cxx)
 	
 	private:
 		// private attributes
@@ -159,7 +132,7 @@ class RandomProjectedNeighborsFOPTICS
 		int N;
 		int nDimensions;
 		int minSplitSize;
-		static const int logOProjectionConstant;
+		static const int logOProjectionConstant = 20;
 		static float sizeTolerance;
 		std::vector< std::pair<chromosome*,std::vector<float> > > points;
 
@@ -180,8 +153,7 @@ class RandomProjectedNeighborsFOPTICS
 		void								getNeighbors(std::vector< std::vector< int > > &);
 		std::vector<float> 					Randomized_InternalCoord_Vector();
         std::vector<float>                  Randomized_CartesianCoord_Vector();
-        std::vector<float>                  Randomly_Selected_Chromosome();
-        bool 								accept_intraset_distance(std::vector<int>);
         void								output_projected_distance(char* end_strfile, char* tmp_end_strfile);
+		// int 								Dice();
 };
 #endif

@@ -1,7 +1,7 @@
 #################################################################
-#      Makefile for the FlexAID program (Linux Version)         #
+# Makefile for the FlexAID program (Linux Version)              #
 #                                                               #
-#         Louis-Philippe Morency & Rafael Najmanovich           #
+# Francis Gaudreault & Rafael Najmanovich                       #
 #                                                               #
 #################################################################
 
@@ -24,13 +24,10 @@ ifeq ($(DEBUG),1)
 endif
 
 # BOOST Installation path
-BOOST_INCLUDES = /usr/local/Cellar/boost/1.58.0/
-#BOOST_INCLUDES = /home/francis/boost_1_53_0
-#BOOST_INCLUDES = /usr/include/boost
+BOOST_INCLUDES = /home/francis/boost_1_53_0:/usr/local/Cellar/boost/1.58.0/
 
 # BOINC Installation path
 BOINC_BUILD = /home/boincadm/boinc
-#BOINC_BUILD = /home/boincadm/boinc-src
 
 LIBDIRS = 
 LIBS = 
@@ -124,15 +121,10 @@ OBJ =	top.o			\
 	read_spheres.o		\
 	generate_grid.o		\
 	cluster.o		\
-	DensityPeak_cluster.o   \
 	rna_structure.o		\
 	maps.o			\
 	shortest_path.o		\
 	assign_shortflex.o 	\
-	BindingMode.o 	\
-	FOPTICS.o 	\
-	ColonyEnergy.o  \
-	entropy_cluster.o
 	
 all: a.out
 	\mv a.out $W/FlexAID_Linux64
@@ -271,7 +263,7 @@ calc_rmsd_chrom.o: $I/calc_rmsd_chrom.c $I/flexaid.h
 	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/calc_rmsd_chrom.c $(INCLUDES)
 
 calc_rmsd.o: $I/calc_rmsd.c $I/flexaid.h
-	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/calc_rmsd.c $(INCLUDES)
+	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/calc_rmsd.c
 
 write_rrd.o: $I/write_rrd.c $I/flexaid.h $I/gaboom.h $I/boinc.h
 	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/write_rrd.c $(INCLUDES)
@@ -339,9 +331,6 @@ generate_grid.o: $I/generate_grid.cpp $I/flexaid.h $I/boinc.h $I/maps.hpp
 cluster.o: $I/cluster.c $I/gaboom.h $I/boinc.h
 	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/cluster.c $(INCLUDES)
 
-DensityPeak_cluster.o: $I/DensityPeak_cluster.c $I/gaboom.h $I/boinc.h
-	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/DensityPeak_cluster.c $(INCLUDES)
-
 rna_structure.o: $I/rna_structure.c $I/boinc.h
 	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/rna_structure.c $(INCLUDES)
 
@@ -353,15 +342,3 @@ assign_shortflex.o: $I/assign_shortflex.c $I/boinc.h
 
 maps.o: $I/maps.cpp $I/maps.hpp
 	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/maps.cpp
-
-BindingMode.o: $I/BindingMode.cpp $I/boinc.h $I/gaboom.h $I/boinc.h
-	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/BindingMode.cpp $(INCLUDES)
-
-FOPTICS.o: $I/FOPTICS.cpp $I/BindingMode.h
-	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/FOPTICS.cpp $(INCLUDES)
-
-ColonyEnergy.o: $I/ColonyEnergy.cpp $I/BindingMode.h
-	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/ColonyEnergy.cpp $(INCLUDES)
-
-entropy_cluster.o: $I/Entropy_cluster.c $I/BindingMode.h $I/gaboom.h
-	$(CXX) $(CXXFLAGS) $(DEFS) -c $I/entropy_cluster.c $(INCLUDES)

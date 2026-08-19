@@ -5,7 +5,7 @@
 int Vcontacts(FA_Global* FA,atom* atoms,resid* residue,VC_Global* VC,
 	      double* clash_value, bool non_scorable)
 {
-    static std::map<std::string, atomindex*> indexed;
+	static map<string, atomindex*> indexed;
 	static atomindex* prev_box = NULL;
 	
 	//VC->planedef = 'X';  // extended radical plane (default)
@@ -455,10 +455,8 @@ RESTART:
     
 	// reduce poly vertex list
 	vj=0;
-	for(vi=0; vi<vn; ++vi) 
-	{
-		if(VC->poly[vi].dist <= rado /*&& &VC->poly[vj] != &VC->poly[vi]*/) 
-		{
+	for(vi=0; vi<vn; ++vi) {
+		if(VC->poly[vi].dist <= rado) {
 			VC->poly[vj] = VC->poly[vi];
 			++vj;
 		}
@@ -476,12 +474,9 @@ RESTART:
 		}
 	}
     
-	if(recalc == 'N') 
-	{
+	if(recalc == 'N') {
 		save_seeds(VC->seed,cont, VC->poly, vn, atomzero);
-	}
-	else
-	{
+	} else {
 		// reset atom coordinates to original values
 		VC->Calc[atomzero].atom->coor[0] = origcoor[0];
 		VC->Calc[atomzero].atom->coor[1] = origcoor[1];
@@ -1571,7 +1566,7 @@ double spherical_arc(const vertex* ptAo,const vertex* ptB,const vertex* ptC, flo
 
 atomindex* index_protein(FA_Global* FA,atom* atoms,resid* residue,atomsas* Calc,
 			 int* Calclist,int* dim,int atmcnt,atomindex* prev_box,
-                         std::map<std::string, atomindex*> & indexed)
+			 map<string, atomindex*> & indexed)
 {
 	int   i,j;             // dumb counters
 	int   resi;            // residue counter
@@ -1650,15 +1645,15 @@ atomindex* index_protein(FA_Global* FA,atom* atoms,resid* residue,atomsas* Calc,
 	dim2 = (*dim)*(*dim);
 	dim3 = (*dim)*(*dim)*(*dim);
 	
-    std::string sig = generate_dim_sig(global_min,(*dim));
-    std::map<std::string, atomindex*>::iterator it;
+	string sig = generate_dim_sig(global_min,(*dim));
+	map<string, atomindex*>::iterator it;
 	if(!FA->vindex || (it=indexed.find(sig)) == indexed.end()){
 		box = (atomindex*)malloc(dim3*sizeof(atomindex));
 		if(!box){
 			fprintf(stderr,"ERROR: memory allocation error for box\n");
 			Terminate(2);
 		}
-        indexed.insert(std::pair<std::string, atomindex*>(sig,box));
+		indexed.insert(std::pair<string, atomindex*>(sig,box));
 		for(atmi=0;atmi<atmcnt;++atmi){
 			// all atoms need to be re-assigned a new box
 			Calc[atmi].boxnum = -1;
@@ -1842,8 +1837,8 @@ int get_contlist4(atom* atoms,int atomzero, contactlist contlist[],
     
 }
 
-std::string generate_dim_sig(float* global_min, int dim){
-	std::stringstream ss("");
+string generate_dim_sig(float* global_min, int dim){
+	stringstream ss("");
 	for(int j=0;j<3;j++){
 		ss << (int)global_min[j] << "/";
 	}

@@ -94,7 +94,7 @@ void DensityPeak_cluster(FA_Global* FA, GB_Global* GB, VC_Global* VC, chromosome
 	{
 		pChrom = &Chrom[i];
 		if(i+1 == num_chrom) calc_rmsd_chrom(FA,GB,chrom,gene_lim,atoms,residue,cleftgrid,GB->num_genes,i,i, pChrom->Coord, NULL, false);
-        else calc_rmsd_chrom(FA,GB,chrom,gene_lim,atoms,residue,cleftgrid,GB->num_genes,i,i+1, pChrom->Coord, (pChrom+1)->Coord, false);
+        else calc_rmsd_chrom(FA,GB,chrom,gene_lim,atoms,residue,cleftgrid,GB->num_genes,i,i+1, pChrom->Coord, (pChrom++)->Coord, false);
 	}
 
 	// (2) Build RMSD Matrix
@@ -782,7 +782,7 @@ float calculate_stddev(ClusterChrom* Chrom, int num_chrom)
 	int i;
 	float mean = calculate_mean(Chrom, num_chrom);
 	float sqrtot = 0.0f;
-    for(i = 0; i < num_chrom; ++i) sqrtot += pow( (mean - (&Chrom[i])->Distance),2.0f );
+    for(i = 0; i < num_chrom; ++i) sqrtot += pow( (mean - (&Chrom[i])->Distance),2.0 );
 	return sqrtf(sqrtot/(float)num_chrom);
 }
 

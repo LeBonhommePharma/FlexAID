@@ -1,8 +1,8 @@
 #include "Vcontacts.h"
 
-/*#define DEBUG_LEVEL 0*/
+#define DEBUG_LEVEL 0
 
-double vcfunction(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue, std::vector< std::pair<int,int> > & intraclashes, bool* error)
+double vcfunction(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue, vector< pair<int,int> > & intraclashes, bool* error)
 {
 	int    rnum=0;
 	int    type=1;
@@ -18,8 +18,6 @@ double vcfunction(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue, std::v
 		FA->optres[j].cf.com=0.0;
 		FA->optres[j].cf.con=0.0;
 		FA->optres[j].cf.sas=0.0;
-		FA->optres[j].cf.ligsolv=0.0;
-		FA->optres[j].cf.tarsolv=0.0;
 		FA->optres[j].cf.totsas=0.0;
 	}
 	
@@ -99,7 +97,7 @@ double vcfunction(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue, std::v
 		double radoA = radA + Rw;
 		
 		double SAS = 4.0*PI*radoA*radoA;
-   		double surfA = SAS;
+       		double surfA = SAS;
 		
 		if(FA->useacs && atoms[atomzero].acs < 0.0){
 			// accessible contact surface with solvent/atom		
@@ -193,43 +191,10 @@ double vcfunction(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue, std::v
 			// always use normalized areas in density functions
 			double yval = get_yval(energy_matrix,area/surfA);
 			
-			// initializes lig and target sol_val to 0.0
-            // these values will be modified if the contact
-            // implies an atom of the ligand and target
-            double lig_sol_val = 0.0, target_sol_val = 0.0;
-
-			
-			// the following if/else block is used to get proper ligand's contact with water in lig_sol_val
-			// and the proper target's contact with water in tar_sol_val
-			// Ideally, there would be only one of the two atoms in contact that is from the ligand
-
-            if(!strcmp(VC->Calc[i].residue->name, FA->resligand->name) 	&&
-               VC->Calc[i].residue->chn == FA->resligand->chn 			&&
-               VC->Calc[i].residue->number == FA->resligand->number  	)
-			{
-				energy_matrix = &FA->energy_matrix[(VC->Calc[i].atom->type-1)*FA->ntypes + (FA->ntypes-1)];
-				lig_sol_val = get_yval(energy_matrix,area/surfA);
-
-				energy_matrix = &FA->energy_matrix[(VC->Calc[VC->ca_rec[currindex].atom].atom->type-1)*FA->ntypes + (FA->ntypes-1)];
-				target_sol_val = get_yval(energy_matrix,area/surfA);
-			}
-            else if(!strcmp(VC->Calc[VC->ca_rec[currindex].atom].residue->name, FA->resligand->name)	&&
-                    VC->Calc[VC->ca_rec[currindex].atom].residue->chn == FA->resligand->chn 			&&
-                    VC->Calc[VC->ca_rec[currindex].atom].residue->number == FA->resligand->number   	)
-			{
-				energy_matrix = &FA->energy_matrix[(VC->Calc[VC->ca_rec[currindex].atom].atom->type-1)*FA->ntypes + (FA->ntypes-1)];
-				lig_sol_val = get_yval(energy_matrix,area/surfA);
-
-				energy_matrix = &FA->energy_matrix[(VC->Calc[i].atom->type-1)*FA->ntypes + (FA->ntypes-1)];
-				target_sol_val = get_yval(energy_matrix,area/surfA);
-			}
-
-
 			SAS -= area;
 			
 			// number of contacts counter
 			contnum++;
-			
 
 #if DEBUG_LEVEL > 0
 			cfs_atom.com  =  0.0;
@@ -293,7 +258,7 @@ double vcfunction(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue, std::v
 			
 			// number of constraints for contact atom
 			int nconscont = atoms[atomcont].ncons;
-  			double dist_opt = 0.0;
+      			double dist_opt = 0.0;
 			
 			// do contacting atoms have the same constraint
 			constraint* cons = NULL;
@@ -343,7 +308,7 @@ double vcfunction(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue, std::v
 				// ligand intramolecular clash exceeds threshold
 				// add an entry in the dee elimination
 				if(intramolecular && type == 1 && Ewall > DEE_WALL_THRESHOLD){
-					intraclashes.push_back(std::pair<int,int>(atomzero-fatm,atomcont-fatm));
+					intraclashes.push_back(pair<int,int>(atomzero-fatm,atomcont-fatm));
 				}
 				
 				// Treat everything as rigid
@@ -357,35 +322,24 @@ double vcfunction(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue, std::v
 				if(FA->intramolecular || !intramolecular) {
 					
 					double contribution = 0.0;
-					double ligsolcontribution = 0.0, tarsolcontribution = 0.0;
 					if(energy_matrix->weight){
 						if(FA->normalize_area){
 							contribution = yval*area/surfA;
-							ligsolcontribution = lig_sol_val*area/surfA;
-							tarsolcontribution = target_sol_val*area/surfA;
 						}else{
 							contribution = yval*area;
-							ligsolcontribution = lig_sol_val*area;
-							tarsolcontribution = target_sol_val*area;
 						}
 					}else{
 						contribution = yval;
-						ligsolcontribution = lig_sol_val;
-						tarsolcontribution = target_sol_val;
 					}
 					
 					if(FA->useacs){
 						//printf("USE ACS\n");
 						//printf("default contribution=%.3f\n", contribution);
 						contribution = contribution * atoms[atomzero].acs/surfA * FA->acsweight;
-						ligsolcontribution = ligsolcontribution * atoms[atomzero].acs/surfA * FA->acsweight;
-						tarsolcontribution = tarsolcontribution * atoms[atomzero].acs/surfA * FA->acsweight;
 						//printf("after contribution=%.3f\n", contribution);
 					}
 					
 					cfs->com += contribution;
-					cfs->ligsolv += ligsolcontribution;
-					cfs->tarsolv += tarsolcontribution;
 					
 #if DEBUG_LEVEL > 0
 					cfs_atom.com += contribution;

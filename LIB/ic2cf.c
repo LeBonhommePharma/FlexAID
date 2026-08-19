@@ -118,7 +118,7 @@ cfstr ic2cf(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue,
 		buildcc(FA,atoms,FA->nmov[i],FA->mov[i]);
 	}
   
-	std::vector< std::pair<int,int> > intraclashes;
+	vector< pair<int,int> > intraclashes;
 	bool error;
 	double penalty = vcfunction(FA,VC,atoms,residue,intraclashes,&error);
 	if(error){
@@ -130,8 +130,6 @@ cfstr ic2cf(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue,
 	cf.wal = 0.0;
 	cf.sas = 0.0;
 	cf.con = 0.0;
-	cf.ligsolv = 0.0;
-	cf.tarsolv = 0.0;
 	cf.rclash = 0;
     
 	for(i=0;i<FA->num_optres;i++){
@@ -158,7 +156,7 @@ cfstr ic2cf(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue,
 			
 			//int fatm = res->fatm[0];
 			if(FA->deelig_flex){
-                std::vector< std::pair<int,int> >::iterator it;
+				vector< pair<int,int> >::iterator it;
 				for(it=intraclashes.begin(); it!=intraclashes.end(); ++it)
 				{
 					for(k=1; k<=res->fdih; k++){
@@ -239,8 +237,6 @@ cfstr ic2cf(FA_Global* FA,VC_Global* VC,atom* atoms,resid* residue,
 		cf.com += FA->optres[i].cf.com;
 		cf.wal += FA->optres[i].cf.wal;
 		cf.sas += FA->optres[i].cf.sas;
-		cf.ligsolv += FA->optres[i].cf.ligsolv;
-		cf.tarsolv += FA->optres[i].cf.tarsolv;
 		cf.con += FA->optres[i].cf.con;
 
 	}

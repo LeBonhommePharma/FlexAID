@@ -114,7 +114,7 @@ float calc_rmsd(FA_Global* FA,atom* atoms,resid* residue, gridpoint* cleftgrid,i
 
 float calc_Hungarian_RMSD(FA_Global* FA, atom* atoms, resid* residue, gridpoint* cleftgrid,int npar, const double* icv)
 {
-    int i,j,k,rot;
+    int i,j,k;
     float rmsd = 0.0f;
     float total_assignment = 0.0f;
     int nTypes = 0;
@@ -140,8 +140,7 @@ float calc_Hungarian_RMSD(FA_Global* FA, atom* atoms, resid* residue, gridpoint*
             if(j == FA->het_res[i])
             {
                 // The 'for loop' below iterates through all the atoms of the ligand
-                rot = residue[j].rot;
-                for(k=residue[j].fatm[rot]; k<=residue[j].latm[rot]; k++)
+                for(k=residue[j].fatm[0]; k<=residue[j].latm[0]; k++)
                 {
                     for(int jj=0; jj < nUniqueTypes+1; jj++)
                     {
@@ -162,7 +161,7 @@ float calc_Hungarian_RMSD(FA_Global* FA, atom* atoms, resid* residue, gridpoint*
                 for(int z = 0; z < nUniqueTypes; z++)
                 {
                     nTypes = 0;
-                    for(k=residue[j].fatm[rot]; k<=residue[j].latm[rot]; k++)
+                    for(k=residue[j].fatm[0]; k<=residue[j].latm[0]; k++)
                     {
                         if(atoms[k].type > 0 && atoms[k].type == unique_atom_type[z]) nTypes++;
                     }
@@ -226,19 +225,19 @@ float calc_Hungarian_RMSD(FA_Global* FA, atom* atoms, resid* residue, gridpoint*
                     int count_j = -1;
                     
                     // Filling the matrix
-                    for(k=residue[j].fatm[rot]; k<=residue[j].latm[rot]; k++) // Foreach Atom in Lig
+                    for(k=residue[j].fatm[0]; k<=residue[j].latm[0]; k++) // Foreach Atom in Lig
                     {
                         if(atoms[k].type == unique_atom_type[z])
                         {
                             count_i++;
                             count_j = -1;
 
-                            for(int l = residue[j].fatm[rot]; l < residue[j].latm[rot]; l++)
+                            for(int l = 0; l < FA->num_het_atm; l++)
                             {
-                                if(atoms[l].type == unique_atom_type[z])
+                                if(atoms[k+l].type == unique_atom_type[z])
                                 {
                                     count_j++;
-                                    matrix[count_i][count_j] = sqrdist(atoms[k].coor,atoms[l].coor_ref);
+                                    matrix[count_i][count_j] = sqrdist(atoms[k].coor,atoms[k+l].coor_ref);
                                 }
                             }
                         }
