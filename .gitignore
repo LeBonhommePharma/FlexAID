@@ -15,3 +15,12 @@
 !*.pdb
 !*.inp.pdb
 !*.clef.pdb
+# interaction matrix the binary loads from its directory by default
+!WRK/MC_st0r5.2_6.dat
+# CI workflow and the tiny smoke-test inputs
+!.github/
+!.github/workflows/
+!.github/workflows/ci.yml
+!ci/
+!ci/smoke/
+!ci/smoke/**

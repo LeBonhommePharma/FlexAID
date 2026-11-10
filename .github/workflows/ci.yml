@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build-and-smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install build dependencies
+        run: |
+          if [ "$(uname)" = "Darwin" ]; then
+            brew install boost ccache
+          else
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libboost-dev ccache
+          fi
+
+      - name: Cache compiler output
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('BIN/Makefile.Linux64', 'LIB/**') }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
+
+      - name: Build with Makefile.Linux64
+        run: |
+          set -euo pipefail
+          if [ "$(uname)" = "Darwin" ]; then
+            boost_includes="$(brew --prefix boost)/include"
+            jobs="$(sysctl -n hw.ncpu)"
+          else
+            boost_includes=/usr/include
+            jobs="$(nproc)"
+          fi
+          export CCACHE_DIR="${HOME}/.cache/ccache"
+          mkdir -p "${CCACHE_DIR}"
+          ccache --set-config=max_size=200M
+          # BOOST_INCLUDES is the Makefile's own variable. The checked-in
+          # default is a developer machine path, so point it at the
+          # system Boost just installed.
+          make -C BIN -f Makefile.Linux64 -j"${jobs}" \
+            CXX="ccache g++" \
+            BOOST_INCLUDES="${boost_includes}"
+          test -x WRK/FlexAID
+
+      - name: Smoke test
+        run: bash ci/smoke/run.sh
